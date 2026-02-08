@@ -36,7 +36,7 @@ A comprehensive multi-source reconnaissance tool that combines intelligence from
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/RedGravity.git
+git clone https://github.com/bratyabasu07/RedGravity.git
 cd RedGravity
 
 # Install dependencies
