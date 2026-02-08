@@ -1,0 +1,47 @@
+# Ignore API keys and sensitive data
+.env
+*.key
+*.pem
+
+# Ignore build artifacts
+redgravity
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignore scan results and outputs
+Target/
+*.json
+*.csv
+*.html
+
+# Include only README
+!README.md
+
+# Ignore test files
+test_*
+demo_*
+example_output.*
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore temporary files
+tmp/
+temp/
+
+# Ignore brain artifacts (development only)
+.gemini/

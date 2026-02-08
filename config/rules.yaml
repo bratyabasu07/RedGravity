@@ -1,0 +1,49 @@
+rules:
+  - name: "High CVSS Only"
+    type: "filter"
+    field: "cvss"
+    operator: ">="
+    value: 7.0
+    enabled: true
+    
+  - name: "Critical Vulnerabilities"
+    type: "filter"
+    field: "cvss"
+    operator: ">="
+    value: 9.0
+    enabled: false
+    
+  - name: "Exclude Cloudflare"
+    type: "exclude"
+    field: "asn"
+    operator: "in"
+    value: [13335]
+    enabled: false
+    
+  - name: "Exclude AWS"
+    type: "exclude"
+    field: "asn"
+    operator: "in"
+    value: [16509, 14618]
+    enabled: false
+    
+  - name: "Exclude Google Cloud"
+    type: "exclude"
+    field: "asn"
+    operator: "in"
+    value: [15169, 396982]
+    enabled: false
+    
+  - name: "Only Exploitable CVEs"
+    type: "filter"
+    field: "exploit_available"
+    operator: "=="
+    value: true
+    enabled: false
+    
+  - name: "Known Exploited Vulnerabilities (KEV)"
+    type: "filter"
+    field: "in_cisa_kev"
+    operator: "=="
+    value: true
+    enabled: false

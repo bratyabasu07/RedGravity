@@ -1,0 +1,103 @@
+# RedGravity Configuration File
+
+# API Keys and External Services
+api_keys:
+  shodan:
+    pool:
+      - "onxgBgt0UqaJOVmYCy71GNgMcYrls2M2"
+      - "kNWoMbgDfszHJqH95uAe0lelO4AsQIim"
+    current_index: 0
+  censys:
+    api_id: "${CENSYS_API_ID}"
+    api_secret: "${CENSYS_API_SECRET}"
+  nvd:
+    api_key: "50791966-1207-4100-b621-151b614acc33"
+  
+  # Vulners (CVE Intelligence)
+  vulners:
+    api_key: "${VULNERS_API_KEY}"
+    
+  greynoise:
+    api_key: ""
+  abuseipdb:
+    api_key: "08e9bceb9ac1702bc87f3a440a92523732dd9692c24c0feaf8d05b05f5fb1976649ec6633047434d"
+  alienvault_otx:
+    api_key: "efc967d1cdaa3025605adf4a023ce6878b484bca5e1b74b5acd0d7e7dfad89c1"
+
+# Pipeline Settings
+pipeline:
+  timeout_seconds: 300
+  retry_attempts: 3
+  retry_backoff_ms: 1000
+  max_concurrent_goroutines: 50
+  
+# Stealth Configuration
+stealth:
+  enabled: false
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"
+    - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+  rate_limit_ms: 500
+  jitter_ms: 200
+  use_doh: true
+  doh_server: "https://1.1.1.1/dns-query"
+  
+# Discovery Settings
+discovery:
+  dns_enumeration: true
+  certificate_transparency: true
+  passive_dns: true
+  
+# Filtering Settings
+filtering:
+  filter_private_ips: true
+  filter_cdn_ips: true
+  filter_cloud_providers: true
+  confidence_threshold: 70
+  
+# Scoring Weights
+scoring:
+  source_diversity: 20
+  cvss_score: 30
+  asn_reputation: 15
+  port_accessibility: 15
+  exploit_availability: 20
+  
+# Output Settings
+output:
+  default_format: "json"
+  supported_formats:
+    - "json"
+    - "csv"
+    - "html"
+    - "markdown"
+  pretty_print: true
+  
+# Database Settings (PostgreSQL)
+database:
+  enabled: false
+  host: "localhost"
+  port: 5432
+  name: "redgravity"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  ssl_mode: "require"
+  
+# Custom Rules
+rules:
+  path: "config/rules.yaml"
+  hot_reload: true
+  
+# ML Settings
+ml:
+  enabled: false
+  model_path: "models/vulnerability_prediction.tflite"
+  
+# API Server Settings
+api:
+  enabled: false
+  host: "localhost"
+  port: 8080
+  auth_required: true
+  api_key: "${API_SERVER_KEY}"
