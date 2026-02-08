@@ -28,7 +28,7 @@ A comprehensive multi-source reconnaissance tool that combines intelligence from
 - **JSON**: Machine-readable structured data
 - **CSV**: Spreadsheet-compatible analysis
 - **HTML**: Interactive visual reports
-- **Markdown**: Human-readable documentation
+- **Markdown**: Clean formatted reports and documentation
 
 ## 🚀 Quick Start
 
