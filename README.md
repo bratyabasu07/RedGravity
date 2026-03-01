@@ -4,8 +4,8 @@
 
 A comprehensive multi-source reconnaissance tool that combines intelligence from Shodan, Censys, NVD, Vulners, AlienVault OTX, and AbuseIPDB to identify vulnerabilities with high confidence scoring.
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
-![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)
+![Version](https://img.shields.io/badge/version-1.1-blue)
+![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/license-Educational-green)
 
 ## ✨ Features
@@ -260,11 +260,10 @@ RedGravity/
 
 - **Censys API**: May require valid paid account for full access
 - **DNS Timeouts**: Network-dependent, 2s timeout per subdomain
-- **Database Persistence**: Not yet implemented (future feature)
 
 ## 🚀 Future Enhancements
 
-- [ ] PostgreSQL persistence
+- [x] PostgreSQL persistence
 - [ ] ML-based confidence boosting
 - [ ] GreyNoise integration
 - [ ] WebUI dashboard

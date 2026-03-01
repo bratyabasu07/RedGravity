@@ -19,6 +19,7 @@ import (
 	"redgravity/internal/version"
 	"redgravity/pkg/utils"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -349,23 +350,49 @@ func setupPipeline(pipeline *core.Pipeline, opts *cli.CLIOptions, cfg *config.Co
 					"mysql", "db", "cdn", "static", "assets", "images", "files")
 			}
 
-			for i, sub := range commonSubs {
-				// Check context before each lookup
-				select {
-				case <-ctx.Done():
-					fmt.Println("  → Discovery cancelled")
-					return map[string]interface{}{"domains": discovered}, ctx.Err()
-				default:
-				}
-
-				subdomain := sub + "." + target
-				fmt.Printf("\r  → Checking subdomain %d/%d...  ", i+1, len(commonSubs))
-				ips, err := utils.ResolveDNSWithContext(ctx, subdomain)
-				if err == nil && len(ips) > 0 {
-					discovered = append(discovered, subdomain)
-					fmt.Printf("\r  ✓ Found: %s (%s)%-20s\n", subdomain, ips[0].String(), " ")
-				}
+			// Parallel DNS enumeration
+			numWorkers := cfg.Pipeline.MaxConcurrentGoroutines
+			if numWorkers <= 0 {
+				numWorkers = 20 // Default reasonable concurrency
 			}
+
+			subCh := make(chan string, len(commonSubs))
+			var discoveryWg sync.WaitGroup
+			var mu sync.Mutex
+
+			fmt.Printf("  → Parallel enumeration (%d workers)\n", numWorkers)
+
+			// Start workers
+			for w := 0; w < numWorkers; w++ {
+				discoveryWg.Add(1)
+				go func() {
+					defer discoveryWg.Done()
+					for sub := range subCh {
+						select {
+						case <-ctx.Done():
+							return
+						default:
+							subdomain := sub + "." + target
+							ips, err := utils.ResolveDNSWithContext(ctx, subdomain)
+							if err == nil && len(ips) > 0 {
+								mu.Lock()
+								discovered = append(discovered, subdomain)
+								mu.Unlock()
+								fmt.Printf("  ✓ Found: %s (%s)\n", subdomain, ips[0].String())
+							}
+						}
+					}
+				}()
+			}
+
+			// Feed workers
+			for _, sub := range commonSubs {
+				subCh <- sub
+			}
+			close(subCh)
+
+			// Wait for workers to finish
+			discoveryWg.Wait()
 			fmt.Printf("\r%-60s\r", " ")
 
 			fmt.Printf("  → Discovered %d domains/subdomains\n", len(discovered))
@@ -692,14 +719,6 @@ func setupPipeline(pipeline *core.Pipeline, opts *cli.CLIOptions, cfg *config.Co
 			return data, nil
 		}, time.Duration(float64(45)*timingMultiplier)*time.Second)
 	}
-
-	// Stage 9: Rules Engine
-	pipeline.AddStage("Rules Engine", func(ctx context.Context, input interface{}) (interface{}, error) {
-		fmt.Println("  → Applying custom rules")
-		time.Sleep(time.Duration(float64(100)*timingMultiplier) * time.Millisecond)
-
-		return input, nil
-	}, time.Duration(float64(15)*timingMultiplier)*time.Second)
 
 	// Stage 10: Output Generation
 	pipeline.AddStage("Output Generation", func(ctx context.Context, input interface{}) (interface{}, error) {

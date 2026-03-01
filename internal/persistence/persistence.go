@@ -157,22 +157,7 @@ func (db *DB) initSchema() error {
 		if !exists {
 			fmt.Printf("[DB] Applying migration version %d...\n", v)
 
-			// Use a transaction for each migration
-			tx, err := db.pool.Begin(ctx)
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback(ctx)
-
-			if _, err := tx.Exec(ctx, sql); err != nil {
-				return fmt.Errorf("failed to apply migration version %d: %w", v, err)
-			}
-
-			if _, err := tx.Exec(ctx, "INSERT INTO migrations (version) VALUES ($1)", v); err != nil {
-				return fmt.Errorf("failed to record migration version %d: %w", v, err)
-			}
-
-			if err := tx.Commit(ctx); err != nil {
+			if err := db.applyMigration(ctx, v, sql); err != nil {
 				return err
 			}
 			fmt.Printf("[DB] Migration version %d applied successfully\n", v)
@@ -180,6 +165,25 @@ func (db *DB) initSchema() error {
 	}
 
 	return nil
+}
+
+// applyMigration applies a single migration in a transaction
+func (db *DB) applyMigration(ctx context.Context, version int, sql string) error {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("failed to apply migration version %d: %w", version, err)
+	}
+
+	if _, err := tx.Exec(ctx, "INSERT INTO migrations (version) VALUES ($1)", version); err != nil {
+		return fmt.Errorf("failed to record migration version %d: %w", version, err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 // SaveScan saves initial scan metadata

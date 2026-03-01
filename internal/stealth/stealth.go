@@ -15,6 +15,7 @@ type StealthLayer struct {
 	Config     *config.StealthConfig
 	userAgents []string
 	currentUA  int
+	rng        *rand.Rand
 }
 
 // NewStealthLayer creates a new stealth layer
@@ -23,6 +24,7 @@ func NewStealthLayer(cfg *config.StealthConfig) *StealthLayer {
 		Config:     cfg,
 		userAgents: cfg.UserAgents,
 		currentUA:  0,
+		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -44,7 +46,7 @@ func (sl *StealthLayer) ApplyRateLimit() {
 	}
 
 	baseDelay := time.Duration(sl.Config.RateLimitMs) * time.Millisecond
-	jitter := time.Duration(rand.Intn(sl.Config.JitterMs)) * time.Millisecond
+	jitter := time.Duration(sl.rng.Intn(sl.Config.JitterMs)) * time.Millisecond
 
 	totalDelay := baseDelay + jitter
 	time.Sleep(totalDelay)
@@ -113,11 +115,11 @@ func (sl *StealthLayer) GenerateNoiseDNSQueries(ctx context.Context, count int) 
 		default:
 		}
 
-		domain := commonDomains[rand.Intn(len(commonDomains))]
+		domain := commonDomains[sl.rng.Intn(len(commonDomains))]
 		net.LookupIP(domain)
 
 		// Random delay between queries
-		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+		time.Sleep(time.Duration(sl.rng.Intn(1000)) * time.Millisecond)
 	}
 }
 

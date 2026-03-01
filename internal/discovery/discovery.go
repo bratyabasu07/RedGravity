@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"redgravity/pkg/utils"
 	"strings"
+	"sync"
 )
 
 // DiscoveryResult holds discovery output
@@ -154,22 +155,32 @@ func AggregateDiscovery(ctx context.Context, target string, discoverers []Discov
 
 	allDomains := make(map[string]bool)
 	var sources []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
 	for _, discoverer := range discoverers {
-		result, err := discoverer.Discover(ctx, target)
-		if err != nil {
-			fmt.Printf("[DISCOVERY] Discoverer failed: %v\n", err)
-			continue
-		}
+		wg.Add(1)
+		go func(d Discoverer) {
+			defer wg.Done()
+			result, err := d.Discover(ctx, target)
+			if err != nil {
+				fmt.Printf("[DISCOVERY] Discoverer failed: %v\n", err)
+				return
+			}
 
-		sources = append(sources, result.Source)
-		for _, domain := range result.Domains {
-			allDomains[domain] = true
-		}
-		for _, subdomain := range result.Subdomains {
-			allDomains[subdomain] = true
-		}
+			mu.Lock()
+			defer mu.Unlock()
+			sources = append(sources, result.Source)
+			for _, domain := range result.Domains {
+				allDomains[domain] = true
+			}
+			for _, subdomain := range result.Subdomains {
+				allDomains[subdomain] = true
+			}
+		}(discoverer)
 	}
+
+	wg.Wait()
 
 	// Convert map to slice
 	var finalDomains []string

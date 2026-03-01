@@ -114,7 +114,7 @@ func PrintBanner() {
 
 // PrintVersion prints version information
 func PrintVersion() {
-	fmt.Println("RedGravity v1.0.0")
+	fmt.Println("RedGravity v1.1.0")
 	fmt.Println("Build: Production")
-	fmt.Println("Go version:", "1.21+")
+	fmt.Println("Go version:", "1.24+")
 }

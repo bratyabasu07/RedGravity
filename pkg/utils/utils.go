@@ -171,31 +171,22 @@ func RandomInt(min, max int) int {
 
 // ResolveDNS resolves a domain to IP addresses with context support
 func ResolveDNS(domain string) ([]net.IP, error) {
-	return ResolveDNSWithContext(nil, domain)
+	return ResolveDNSWithContext(context.Background(), domain)
 }
 
 // ResolveDNSWithContext resolves a domain to IP addresses with context and timeout
-func ResolveDNSWithContext(ctx interface{}, domain string) ([]net.IP, error) {
+func ResolveDNSWithContext(ctx context.Context, domain string) ([]net.IP, error) {
 	// Create resolver with timeout
 	resolver := &net.Resolver{
 		PreferGo: true,
 	}
 
-	// If no context provided, create one with timeout
-	var resolveCtx interface{}
-	if ctx == nil {
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		resolveCtx = timeoutCtx
-	} else {
-		// Add timeout even to provided context
-		timeoutCtx, cancel := context.WithTimeout(ctx.(context.Context), 2*time.Second)
-		defer cancel()
-		resolveCtx = timeoutCtx
-	}
+	// Add timeout to the provided context
+	timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
 
 	// Use LookupIP with context
-	ips, err := resolver.LookupIP(resolveCtx.(context.Context), "ip", domain)
+	ips, err := resolver.LookupIP(timeoutCtx, "ip", domain)
 	if err != nil {
 		return nil, fmt.Errorf("DNS lookup failed for %s: %w", domain, err)
 	}

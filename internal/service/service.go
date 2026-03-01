@@ -82,18 +82,20 @@ func (sd *ShodanDetector) Detect(ctx context.Context, ips []net.IP) ([]ServiceIn
 			fmt.Printf("[SERVICE] Shodan API failed for %s: %v\n", ipStr, err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			fmt.Printf("[SERVICE] Shodan returned status %d for %s\n", resp.StatusCode, ipStr)
 			continue
 		}
 
 		var shodanResp ShodanResponse
 		if err := json.NewDecoder(resp.Body).Decode(&shodanResp); err != nil {
+			resp.Body.Close()
 			fmt.Printf("[SERVICE] Failed to parse Shodan response for %s: %v\n", ipStr, err)
 			continue
 		}
+		resp.Body.Close()
 
 		// Parse services
 		for _, data := range shodanResp.Data {
@@ -176,18 +178,20 @@ func (cd *CensysDetector) Detect(ctx context.Context, ips []net.IP) ([]ServiceIn
 			fmt.Printf("[SERVICE] Censys API failed for %s: %v\n", ipStr, err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			fmt.Printf("[SERVICE] Censys returned status %d for %s\n", resp.StatusCode, ipStr)
 			continue
 		}
 
 		var censysResp CensysResponse
 		if err := json.NewDecoder(resp.Body).Decode(&censysResp); err != nil {
+			resp.Body.Close()
 			fmt.Printf("[SERVICE] Failed to parse Censys response for %s: %v\n", ipStr, err)
 			continue
 		}
+		resp.Body.Close()
 
 		// Parse services
 		for _, svc := range censysResp.Result.Services {

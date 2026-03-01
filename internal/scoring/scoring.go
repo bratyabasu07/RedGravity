@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"redgravity/internal/cve"
 	"redgravity/internal/version"
+	"strings"
 )
 
 // ScoreWeights holds scoring weight configuration
@@ -178,12 +179,11 @@ func (s *Scorer) calculateExploitAvailability(cves []cve.CVEInfo) int {
 // containsExploitKeyword checks if a URL contains exploit-related keywords
 func containsExploitKeyword(url string) bool {
 	keywords := []string{"exploit", "poc", "metasploit", "exploitdb"}
-	urlLower := fmt.Sprintf("%s", url)
+	urlLower := strings.ToLower(url)
 
 	for _, keyword := range keywords {
-		if len(urlLower) > 0 && len(keyword) > 0 {
-			// Simple substring check
-			return true // Simplified for now
+		if strings.Contains(urlLower, keyword) {
+			return true
 		}
 	}
 
