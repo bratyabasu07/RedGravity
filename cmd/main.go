@@ -13,6 +13,7 @@ import (
 	"redgravity/internal/cve"
 	"redgravity/internal/ip"
 	"redgravity/internal/noise"
+	"redgravity/internal/persistence"
 	"redgravity/internal/service"
 	"redgravity/internal/threat"
 	"redgravity/internal/version"
@@ -94,6 +95,12 @@ func main() {
 		cfg.Output.DefaultFormat = opts.Format
 	}
 
+	// Override database mode if CLI flag is set
+	if opts.Database {
+		cfg.Database.Enabled = true
+		fmt.Println("[DB] Database storage enabled via CLI")
+	}
+
 	// Auto-create Target directory in project location (not current dir)
 	// Find project directory (where config was loaded from)
 	projectDir := "/home/elliot/RedGravity" // Default fallback
@@ -129,6 +136,18 @@ func main() {
 	fmt.Printf("[SCAN] Output File: %s\n", opts.Output)
 	fmt.Println()
 
+	// Initialize database storage if enabled
+	var db *persistence.DB
+	if cfg.Database.Enabled {
+		var err error
+		db, err = persistence.NewDB(&cfg.Database)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Failed to initialize database: %v\n", err)
+			os.Exit(1)
+		}
+		defer db.Close()
+	}
+
 	// Create pipeline
 	pipeline := core.NewPipeline(
 		time.Duration(cfg.Pipeline.TimeoutSeconds)*time.Second,
@@ -155,8 +174,21 @@ func main() {
 		"config": cfg,
 	}
 
+	// Generate scan ID
+	scanID := fmt.Sprintf("scan-%d", time.Now().Unix())
+
+	// Save scan metadata if DB enabled
+	if db != nil {
+		if err := db.SaveScan(ctx, scanID, opts.Target, opts.Mode, "started"); err != nil {
+			fmt.Printf("[DB] Warning: Failed to save scan metadata: %v\n", err)
+		}
+	}
+
 	// Execute pipeline
 	if err := pipeline.Run(ctx, initialInput); err != nil {
+		if db != nil {
+			db.UpdateScanStatus(ctx, scanID, "failed", 0, 0, 0)
+		}
 		fmt.Fprintf(os.Stderr, "\n[ERROR] Pipeline failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -177,6 +209,47 @@ func main() {
 	}
 
 	fmt.Printf("[OUTPUT] Report successfully saved to: %s\n", opts.Output)
+
+	// Final database update
+	if db != nil {
+		totalIPs := results["total_ips"].(int)
+		totalServices := results["total_services"].(int)
+		totalCVEs := results["total_cves"].(int)
+		db.UpdateScanStatus(ctx, scanID, "completed", totalIPs, totalServices, totalCVEs)
+
+		// Save detailed results to DB
+		fmt.Println("[DB] Saving detailed results to PostgreSQL...")
+		saveResultsToDB(ctx, db, scanID, results)
+	}
+}
+
+// saveResultsToDB persists discovery results to database
+func saveResultsToDB(ctx context.Context, db *persistence.DB, scanID string, results map[string]interface{}) {
+	if resultsList, ok := results["results"].([]map[string]interface{}); ok {
+		for _, r := range resultsList {
+			ip := r["ip"].(string)
+			port := r["port"].(int)
+			svcName := r["service"].(string)
+			version := r["version"].(string)
+			confidence := r["confidence"].(int)
+
+			// Save service and get its ID
+			serviceID, err := db.SaveService(ctx, scanID, ip, port, "tcp", svcName, version, "", "pipeline", confidence)
+			if err != nil {
+				fmt.Printf("[DB] Error saving service %s:%d: %v\n", ip, port, err)
+				continue
+			}
+
+			// Save associated CVEs
+			if cveList, ok := r["cves"].([]string); ok {
+				for _, cveID := range cveList {
+					// We don't have full CVE details here, just the ID
+					// In a real scenario, we might want to fetch or pass full info
+					db.SaveCVE(ctx, serviceID, cveID, 0.0, "UNKNOWN", "", false, []string{})
+				}
+			}
+		}
+	}
 }
 
 // extractPipelineResults converts pipeline result to output format

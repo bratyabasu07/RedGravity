@@ -91,7 +91,7 @@ func (re *RulesEngine) applyRule(rule Rule, scores []scoring.ConfidenceScore, cv
 
 	for _, score := range scores {
 		key := fmt.Sprintf("%s:%d", score.IP, score.Port)
-		cveMatch, hasCVE := cveMap[key]
+		cveMatch, _ := cveMap[key]
 
 		pass := false
 

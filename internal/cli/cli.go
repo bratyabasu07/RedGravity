@@ -16,6 +16,7 @@ type CLIOptions struct {
 	ConfigFile string
 	Verbose    bool
 	Version    bool
+	Database   bool
 }
 
 // ParseFlags parses command-line flags
@@ -44,6 +45,7 @@ func ParseFlags() *CLIOptions {
 	flag.BoolVar(&opts.Verbose, "v", false, "Enable verbose output (shorthand)")
 
 	flag.BoolVar(&opts.Version, "version", false, "Print version and exit")
+	flag.BoolVar(&opts.Database, "db", false, "Enable database storage")
 
 	flag.Usage = func() {
 		PrintBanner()
