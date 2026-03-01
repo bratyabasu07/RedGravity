@@ -4,14 +4,14 @@
 api_keys:
   shodan:
     pool:
-      - "onxgBgt0UqaJOVmYCy71GNgMcYrls2M2"
-      - "kNWoMbgDfszHJqH95uAe0lelO4AsQIim"
+      - "${SHODAN_API_KEY_1}"
+      - "${SHODAN_API_KEY_2}"
     current_index: 0
   censys:
     api_id: "${CENSYS_API_ID}"
     api_secret: "${CENSYS_API_SECRET}"
   nvd:
-    api_key: "50791966-1207-4100-b621-151b614acc33"
+    api_key: "${NVD_API_KEY}"
   
   # Vulners (CVE Intelligence)
   vulners:
@@ -20,9 +20,9 @@ api_keys:
   greynoise:
     api_key: ""
   abuseipdb:
-    api_key: "08e9bceb9ac1702bc87f3a440a92523732dd9692c24c0feaf8d05b05f5fb1976649ec6633047434d"
+    api_key: "${ABUSEIPDB_API_KEY}"
   alienvault_otx:
-    api_key: "efc967d1cdaa3025605adf4a023ce6878b484bca5e1b74b5acd0d7e7dfad89c1"
+    api_key: "${OTX_API_KEY}"
 
 # Pipeline Settings
 pipeline:
