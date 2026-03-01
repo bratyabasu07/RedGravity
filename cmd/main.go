@@ -11,15 +11,14 @@ import (
 	"redgravity/internal/config"
 	"redgravity/internal/core"
 	"redgravity/internal/cve"
+	"redgravity/internal/discovery"
 	"redgravity/internal/ip"
 	"redgravity/internal/noise"
 	"redgravity/internal/persistence"
 	"redgravity/internal/service"
 	"redgravity/internal/threat"
 	"redgravity/internal/version"
-	"redgravity/pkg/utils"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -331,81 +330,64 @@ func setupPipeline(pipeline *core.Pipeline, opts *cli.CLIOptions, cfg *config.Co
 	// Stage 1: Discovery
 	pipeline.AddStage("Discovery", func(ctx context.Context, input interface{}) (interface{}, error) {
 		target := opts.Target
-		var discovered []string
-		discovered = append(discovered, target) // Base domain/IP
 
-		// Only do subdomain discovery for actual domains in normal/deep mode
-		if opts.Mode != "fast" && !strings.Contains(target, "/") && net.ParseIP(target) == nil {
-			fmt.Println("  → DNS enumeration")
+		// Only do discovery for actual domains
+		if strings.Contains(target, "/") || net.ParseIP(target) != nil {
+			return map[string]interface{}{"domains": []string{target}}, nil
+		}
 
-			// Common subdomains to check
+		var discoverers []discovery.Discoverer
+
+		// 1. DNS Brute-forcing (integrated here or via script)
+		// For now we use the logic from within main but refactored to be cleaner
+		// or we can use a basic discoverer. Let's add Crtsh natively.
+
+		// 2. Certificate Transparency
+		if cfg.Discovery.CertificateTransparency {
+			discoverers = append(discoverers, discovery.NewCrtshDiscoverer())
+		}
+
+		// 3. DNS Enumeration (if enabled)
+		if cfg.Discovery.DNSEnumeration {
+			// Selection of common subdomains
 			commonSubs := []string{"www", "mail", "ftp", "smtp", "pop", "imap",
 				"webmail", "admin", "portal", "api", "app", "dev", "staging",
 				"test", "blog", "shop", "store"}
 
 			if opts.Mode == "deep" {
-				fmt.Println("  → Extended subdomain enumeration")
-				// Add more for deep scan
 				commonSubs = append(commonSubs, "vpn", "remote", "git", "jenkins",
 					"mysql", "db", "cdn", "static", "assets", "images", "files")
 			}
 
-			// Parallel DNS enumeration
-			numWorkers := cfg.Pipeline.MaxConcurrentGoroutines
-			if numWorkers <= 0 {
-				numWorkers = 20 // Default reasonable concurrency
+			concurrency := cfg.Pipeline.MaxConcurrentGoroutines
+			if concurrency <= 0 {
+				concurrency = 20
 			}
 
-			subCh := make(chan string, len(commonSubs))
-			var discoveryWg sync.WaitGroup
-			var mu sync.Mutex
+			discoverers = append(discoverers, discovery.NewParallelDNSDiscoverer(commonSubs, concurrency))
+		}
 
-			fmt.Printf("  → Parallel enumeration (%d workers)\n", numWorkers)
+		result, err := discovery.AggregateDiscovery(ctx, target, discoverers)
+		if err != nil {
+			return nil, err
+		}
 
-			// Start workers
-			for w := 0; w < numWorkers; w++ {
-				discoveryWg.Add(1)
-				go func() {
-					defer discoveryWg.Done()
-					for sub := range subCh {
-						select {
-						case <-ctx.Done():
-							return
-						default:
-							subdomain := sub + "." + target
-							ips, err := utils.ResolveDNSWithContext(ctx, subdomain)
-							if err == nil && len(ips) > 0 {
-								mu.Lock()
-								discovered = append(discovered, subdomain)
-								mu.Unlock()
-								fmt.Printf("  ✓ Found: %s (%s)\n", subdomain, ips[0].String())
-							}
-						}
-					}
-				}()
+		// Ensure target itself is in the list
+		foundTarget := false
+		for _, d := range result.Domains {
+			if d == target {
+				foundTarget = true
+				break
 			}
-
-			// Feed workers
-			for _, sub := range commonSubs {
-				subCh <- sub
-			}
-			close(subCh)
-
-			// Wait for workers to finish
-			discoveryWg.Wait()
-			fmt.Printf("\r%-60s\r", " ")
-
-			fmt.Printf("  → Discovered %d domains/subdomains\n", len(discovered))
-		} else {
-			if opts.Mode == "fast" {
-				fmt.Println("  → Quick DNS lookup")
-			}
+		}
+		if !foundTarget {
+			result.Domains = append(result.Domains, target)
 		}
 
 		return map[string]interface{}{
-			"domains": discovered,
+			"domains": result.Domains,
 		}, nil
-	}, time.Duration(float64(120)*timingMultiplier)*time.Second) // Increased timeout for DNS enumeration
+	}, time.Duration(float64(120)*timingMultiplier)*time.Second)
 
 	// Stage 2: IP Normalization
 	pipeline.AddStage("IP Normalization", func(ctx context.Context, input interface{}) (interface{}, error) {

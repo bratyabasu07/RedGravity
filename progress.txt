@@ -1,0 +1,10 @@
+# RedGravity Progress Tracker
+# Auto-updated by Ralph Loop agent
+
+[DONE] Task 1: Implement PostgreSQL Persistence — Added database layer using pgxpool for storing scan results, services, CVEs, threats, and scores. Added --db flag and schema migration system.
+[DONE] Task 2: Add Parallel DNS Lookups — Implemented ParallelDNSDiscoverer using worker pool pattern and native Go resolver. Configurable concurrency via cfg.Pipeline.MaxConcurrentGoroutines.
+[DONE] Task 3: Implement Certificate Transparency Logs — Added native Go CrtshDiscoverer for querying crt.sh API. Refactored discovery logic into modular internal/discovery package.
+[TODO] Task 4: Add REST API Mode
+[TODO] Task 5: Add Unit Tests for Pipeline
+[TODO] Task 6: Improve Stealth Mode
+[TODO] Task 7: Build WebUI Dashboard

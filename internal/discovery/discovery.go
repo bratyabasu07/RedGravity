@@ -2,11 +2,14 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"redgravity/pkg/utils"
 	"strings"
 	"sync"
+	"time"
 )
 
 // DiscoveryResult holds discovery output
@@ -31,6 +34,71 @@ func NewDNSDiscoverer(scriptPath string) *DNSDiscoverer {
 	return &DNSDiscoverer{
 		PythonScript: scriptPath,
 	}
+}
+
+// ParallelDNSDiscoverer performs parallel DNS brute-forcing
+type ParallelDNSDiscoverer struct {
+	Subdomains  []string
+	Concurrency int
+}
+
+// NewParallelDNSDiscoverer creates a new parallel DNS discoverer
+func NewParallelDNSDiscoverer(subdomains []string, concurrency int) *ParallelDNSDiscoverer {
+	if concurrency <= 0 {
+		concurrency = 20
+	}
+	return &ParallelDNSDiscoverer{
+		Subdomains:  subdomains,
+		Concurrency: concurrency,
+	}
+}
+
+// Discover performs parallel DNS discovery
+func (d *ParallelDNSDiscoverer) Discover(ctx context.Context, target string) (*DiscoveryResult, error) {
+	fmt.Printf("[DISCOVERY] Running parallel DNS enumeration for: %s (%d workers)\n", target, d.Concurrency)
+
+	subCh := make(chan string, len(d.Subdomains))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var discovered []string
+
+	// Start workers
+	for w := 0; w < d.Concurrency; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for sub := range subCh {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					subdomain := sub + "." + target
+					ips, err := utils.ResolveDNSWithContext(ctx, subdomain)
+					if err == nil && len(ips) > 0 {
+						mu.Lock()
+						discovered = append(discovered, subdomain)
+						mu.Unlock()
+					}
+				}
+			}
+		}()
+	}
+
+	// Feed workers
+	for _, sub := range d.Subdomains {
+		subCh <- sub
+	}
+	close(subCh)
+
+	// Wait for workers
+	wg.Wait()
+
+	fmt.Printf("[DISCOVERY] DNS enumeration found %d subdomains\n", len(discovered))
+	return &DiscoveryResult{
+		Domains:    discovered,
+		Subdomains: discovered,
+		Source:     "parallel_dns",
+	}, nil
 }
 
 // Discover performs DNS discovery
@@ -145,7 +213,71 @@ func (c *CertificateDiscoverer) Discover(ctx context.Context, target string) (*D
 	return &DiscoveryResult{
 		Domains:    domains,
 		Subdomains: domains,
-		Source:     "cert_transparency",
+		Source:     "cert_transparency_python",
+	}, nil
+}
+
+// CrtshDiscoverer discovers subdomains via crt.sh API (native Go)
+type CrtshDiscoverer struct {
+	HTTPClient *utils.HTTPClientWithRetry
+}
+
+// NewCrtshDiscoverer creates a new crt.sh discoverer
+func NewCrtshDiscoverer() *CrtshDiscoverer {
+	return &CrtshDiscoverer{
+		HTTPClient: utils.NewHTTPClientWithRetry(3, 1*time.Second),
+	}
+}
+
+// Discover fetches certificate records from crt.sh
+func (c *CrtshDiscoverer) Discover(ctx context.Context, target string) (*DiscoveryResult, error) {
+	fmt.Printf("[DISCOVERY] Querying crt.sh for: %s\n", target)
+
+	url := fmt.Sprintf("https://crt.sh/?q=%%.%s&output=json", target)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("crt.sh request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("crt.sh returned status: %d", resp.StatusCode)
+	}
+
+	var entries []struct {
+		NameValue string `json:"name_value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("failed to decode crt.sh response: %w", err)
+	}
+
+	domainMap := make(map[string]bool)
+	for _, entry := range entries {
+		subs := strings.Split(entry.NameValue, "\n")
+		for _, sub := range subs {
+			sub = strings.TrimSpace(sub)
+			if sub != "" && !strings.Contains(sub, "*") {
+				domainMap[sub] = true
+			}
+		}
+	}
+
+	var domains []string
+	for domain := range domainMap {
+		domains = append(domains, domain)
+	}
+
+	fmt.Printf("[DISCOVERY] crt.sh found %d domains\n", len(domains))
+	return &DiscoveryResult{
+		Domains:    domains,
+		Subdomains: domains,
+		Source:     "crt.sh",
 	}, nil
 }
 
