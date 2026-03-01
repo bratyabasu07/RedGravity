@@ -46,3 +46,4 @@ temp/
 # Ignore brain artifacts (development only)
 .gemini/
 progress.txt
+config/config.yaml
